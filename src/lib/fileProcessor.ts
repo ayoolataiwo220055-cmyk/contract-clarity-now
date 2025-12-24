@@ -210,6 +210,78 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
     });
   }
   
+  // Detect overtime clauses
+  if (lowerText.includes('overtime') || lowerText.includes('extra hours') || lowerText.includes('time and a half') || lowerText.includes('work hours') || lowerText.includes('additional hours')) {
+    clauses.push({
+      title: 'Overtime Provisions',
+      content: 'Overtime work requirements and compensation terms identified.',
+      category: 'other',
+    });
+    
+    if (lowerText.includes('exempt') || lowerText.includes('no overtime pay') || lowerText.includes('unpaid overtime') || lowerText.includes('salaried exempt')) {
+      riskAreas.push({
+        severity: 'medium',
+        title: 'Overtime Exemption',
+        description: 'This contract may classify you as overtime-exempt, limiting extra compensation for additional hours worked.',
+        recommendation: 'Verify your exempt status meets legal requirements and understand expected working hours.',
+      });
+    }
+  }
+  
+  // Detect probation period clauses
+  if (lowerText.includes('probation') || lowerText.includes('probationary period') || lowerText.includes('trial period') || lowerText.includes('introductory period') || lowerText.includes('evaluation period')) {
+    clauses.push({
+      title: 'Probation Period',
+      content: 'Probationary or trial employment period terms detected.',
+      category: 'other',
+    });
+    
+    if (lowerText.includes('reduced benefits') || lowerText.includes('no benefits during') || lowerText.includes('limited benefits') || lowerText.includes('benefits begin after')) {
+      riskAreas.push({
+        severity: 'low',
+        title: 'Probation Period Benefits',
+        description: 'Benefits may be limited or unavailable during the probationary period.',
+        recommendation: 'Understand what benefits apply during probation and when full benefits begin.',
+      });
+    }
+    
+    if (lowerText.includes('terminate during probation') || lowerText.includes('dismissal during probation') || lowerText.includes('end employment during')) {
+      riskAreas.push({
+        severity: 'medium',
+        title: 'Probation Termination Terms',
+        description: 'The contract allows for easier termination during the probationary period.',
+        recommendation: 'Review what protections, if any, apply during your probation period.',
+      });
+    }
+  }
+  
+  // Detect intellectual property clauses
+  if (lowerText.includes('intellectual property') || lowerText.includes('invention') || lowerText.includes('work product') || lowerText.includes('copyright') || lowerText.includes('patent') || lowerText.includes('trade secret')) {
+    clauses.push({
+      title: 'Intellectual Property Rights',
+      content: 'IP ownership, invention assignment, and work product terms detected.',
+      category: 'other',
+    });
+    
+    if (lowerText.includes('all inventions') || lowerText.includes('employer owns') || lowerText.includes('assign all rights') || lowerText.includes('work for hire') || lowerText.includes('company property')) {
+      riskAreas.push({
+        severity: 'high',
+        title: 'Broad IP Assignment',
+        description: 'This contract may require assignment of all intellectual property rights, potentially including personal projects created outside work hours.',
+        recommendation: 'Clarify scope of IP assignment and negotiate carve-outs for personal projects if needed.',
+      });
+    }
+    
+    if (lowerText.includes('prior invention') || lowerText.includes('existing invention') || lowerText.includes('invention disclosure')) {
+      riskAreas.push({
+        severity: 'low',
+        title: 'Prior Inventions Disclosure',
+        description: 'You may need to disclose existing inventions to exclude them from the IP assignment.',
+        recommendation: 'List all prior inventions you wish to retain rights to before signing.',
+      });
+    }
+  }
+  
   // Add a general note if minimal content detected
   if (clauses.length === 0) {
     clauses.push({
@@ -235,14 +307,6 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
       title: 'Mandatory Arbitration',
       description: 'Disputes may require resolution through arbitration rather than court.',
       recommendation: 'Consider the implications of mandatory arbitration clauses.',
-    });
-  }
-  
-  if (lowerText.includes('intellectual property') || lowerText.includes('invention') || lowerText.includes('work product')) {
-    clauses.push({
-      title: 'Intellectual Property',
-      content: 'IP ownership and invention assignment terms detected.',
-      category: 'other',
     });
   }
   
