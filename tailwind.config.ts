@@ -57,33 +57,59 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        navy: {
+          DEFAULT: "hsl(209 63% 16%)",
+          light: "hsl(209 50% 25%)",
+        },
+        slate: {
+          DEFAULT: "hsl(220 9% 46%)",
+        },
+        teal: {
+          DEFAULT: "hsl(179 46% 33%)",
+          light: "hsl(179 46% 45%)",
+        },
+      },
+      fontFamily: {
+        heading: ['Georgia', 'Times New Roman', 'serif'],
+        body: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      boxShadow: {
+        subtle: "0 1px 3px 0 hsl(210 20% 50% / 0.1)",
+        card: "0 4px 6px -1px hsl(210 20% 50% / 0.1), 0 2px 4px -2px hsl(210 20% 50% / 0.1)",
+      },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "slide-up": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        spin: {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
+        "slide-up": "slide-up 0.4s ease-out",
+        spin: "spin 1s linear infinite",
       },
     },
   },
