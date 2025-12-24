@@ -1,9 +1,3 @@
-import * as pdfjsLib from 'pdfjs-dist';
-import mammoth from 'mammoth';
-
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
 export interface ProcessingResult {
   success: boolean;
   text: string;
@@ -31,23 +25,22 @@ export interface RiskArea {
 const ALLOWED_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
 ];
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt'];
 
 export function validateFile(file: File): { valid: boolean; error?: string } {
-  // Check file type
   const extension = '.' + file.name.split('.').pop()?.toLowerCase();
   const isValidType = ALLOWED_TYPES.includes(file.type) || ALLOWED_EXTENSIONS.includes(extension);
   
   if (!isValidType) {
     return {
       valid: false,
-      error: 'Invalid file type. Please upload a PDF or DOCX file.',
+      error: 'Invalid file type. Please upload a PDF, DOCX, or TXT file.',
     };
   }
 
-  // Check file size (max 10MB)
   const maxSize = 10 * 1024 * 1024;
   if (file.size > maxSize) {
     return {
@@ -59,7 +52,28 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
   return { valid: true };
 }
 
+// Load PDF.js from CDN
+async function loadPdfJs(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).pdfjsLib) {
+      resolve((window as any).pdfjsLib);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = () => {
+      const pdfjsLib = (window as any).pdfjsLib;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve(pdfjsLib);
+    };
+    script.onerror = () => reject(new Error('Failed to load PDF.js'));
+    document.head.appendChild(script);
+  });
+}
+
 async function extractPdfText(file: File): Promise<{ text: string; pageCount: number }> {
+  const pdfjsLib = await loadPdfJs();
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const pageCount = pdf.numPages;
@@ -79,20 +93,64 @@ async function extractPdfText(file: File): Promise<{ text: string; pageCount: nu
 }
 
 async function extractDocxText(file: File): Promise<string> {
+  // Simple DOCX extraction using JSZip approach
+  // DOCX files are ZIP archives containing XML
   const arrayBuffer = await file.arrayBuffer();
-  const result = await mammoth.extractRawText({ arrayBuffer });
-  return result.value;
+  
+  try {
+    // Load JSZip from CDN if not available
+    if (!(window as any).JSZip) {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load JSZip'));
+        document.head.appendChild(script);
+      });
+    }
+    
+    const JSZip = (window as any).JSZip;
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const documentXml = await zip.file('word/document.xml')?.async('string');
+    
+    if (!documentXml) {
+      return 'Unable to extract text from this DOCX file.';
+    }
+    
+    // Parse XML and extract text content
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(documentXml, 'application/xml');
+    
+    // Get all text elements
+    const textNodes = doc.getElementsByTagName('w:t');
+    let text = '';
+    
+    for (let i = 0; i < textNodes.length; i++) {
+      text += textNodes[i].textContent + ' ';
+    }
+    
+    // Clean up and format
+    return text
+      .replace(/\s+/g, ' ')
+      .trim();
+  } catch (error) {
+    console.error('DOCX extraction error:', error);
+    return 'Error extracting text from DOCX file. Please try a PDF or TXT file.';
+  }
+}
+
+async function extractTxtText(file: File): Promise<string> {
+  return await file.text();
 }
 
 function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: RiskArea[] } {
-  // Placeholder clause detection based on common contract keywords
   const clauses: ClauseAnalysis[] = [];
   const riskAreas: RiskArea[] = [];
   
   const lowerText = text.toLowerCase();
   
   // Detect compensation clauses
-  if (lowerText.includes('salary') || lowerText.includes('compensation') || lowerText.includes('wage')) {
+  if (lowerText.includes('salary') || lowerText.includes('compensation') || lowerText.includes('wage') || lowerText.includes('pay')) {
     clauses.push({
       title: 'Compensation Terms',
       content: 'Salary and compensation details detected in document.',
@@ -101,14 +159,14 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect termination clauses
-  if (lowerText.includes('termination') || lowerText.includes('notice period')) {
+  if (lowerText.includes('termination') || lowerText.includes('notice period') || lowerText.includes('dismissal')) {
     clauses.push({
       title: 'Termination Conditions',
       content: 'Employment termination provisions identified.',
       category: 'termination',
     });
     
-    if (lowerText.includes('immediate termination') || lowerText.includes('at will')) {
+    if (lowerText.includes('immediate termination') || lowerText.includes('at will') || lowerText.includes('at-will')) {
       riskAreas.push({
         severity: 'medium',
         title: 'At-Will Employment',
@@ -119,7 +177,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect confidentiality clauses
-  if (lowerText.includes('confidential') || lowerText.includes('non-disclosure') || lowerText.includes('nda')) {
+  if (lowerText.includes('confidential') || lowerText.includes('non-disclosure') || lowerText.includes('nda') || lowerText.includes('proprietary')) {
     clauses.push({
       title: 'Confidentiality Agreement',
       content: 'Non-disclosure and confidentiality requirements present.',
@@ -128,7 +186,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect non-compete clauses
-  if (lowerText.includes('non-compete') || lowerText.includes('non compete') || lowerText.includes('compete with')) {
+  if (lowerText.includes('non-compete') || lowerText.includes('non compete') || lowerText.includes('compete with') || lowerText.includes('competitive business')) {
     clauses.push({
       title: 'Non-Compete Clause',
       content: 'Restrictions on future employment detected.',
@@ -144,7 +202,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect benefits
-  if (lowerText.includes('benefit') || lowerText.includes('insurance') || lowerText.includes('vacation') || lowerText.includes('401k')) {
+  if (lowerText.includes('benefit') || lowerText.includes('insurance') || lowerText.includes('vacation') || lowerText.includes('401k') || lowerText.includes('pension')) {
     clauses.push({
       title: 'Benefits Package',
       content: 'Employee benefits and perks mentioned.',
@@ -162,7 +220,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Check for potentially concerning language
-  if (lowerText.includes('waive') || lowerText.includes('forfeit')) {
+  if (lowerText.includes('waive') || lowerText.includes('forfeit') || lowerText.includes('relinquish')) {
     riskAreas.push({
       severity: 'medium',
       title: 'Rights Waiver Language',
@@ -177,6 +235,14 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
       title: 'Mandatory Arbitration',
       description: 'Disputes may require resolution through arbitration rather than court.',
       recommendation: 'Consider the implications of mandatory arbitration clauses.',
+    });
+  }
+  
+  if (lowerText.includes('intellectual property') || lowerText.includes('invention') || lowerText.includes('work product')) {
+    clauses.push({
+      title: 'Intellectual Property',
+      content: 'IP ownership and invention assignment terms detected.',
+      category: 'other',
     });
   }
   
@@ -196,6 +262,8 @@ export async function processFile(file: File): Promise<ProcessingResult> {
       pageCount = result.pageCount;
     } else if (extension === '.docx' || file.type.includes('wordprocessingml')) {
       text = await extractDocxText(file);
+    } else if (extension === '.txt' || file.type === 'text/plain') {
+      text = await extractTxtText(file);
     }
     
     const wordCount = text.split(/\s+/).filter(word => word.length > 0).length;
