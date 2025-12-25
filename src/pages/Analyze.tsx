@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageLayout from "@/components/layout/PageLayout";
-import { validateFile, processFile, ProcessingResult, ClauseAnalysis, RiskArea } from "@/lib/fileProcessor";
+import { validateFile, processFile, ProcessingResult, ClauseAnalysis, RiskArea, RiskScore } from "@/lib/fileProcessor";
 import { cn } from "@/lib/utils";
 
 const Analyze = () => {
@@ -91,7 +91,27 @@ const Analyze = () => {
       case 'confidentiality': return 'bg-blue-100 text-blue-700';
       case 'non-compete': return 'bg-purple-100 text-purple-700';
       case 'benefits': return 'bg-cyan-100 text-cyan-700';
+      case 'non-solicitation': return 'bg-orange-100 text-orange-700';
+      case 'relocation': return 'bg-amber-100 text-amber-700';
       default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getRiskScoreColor = (level: RiskScore['level']) => {
+    switch (level) {
+      case 'critical': return 'text-destructive bg-destructive/10 border-destructive';
+      case 'high': return 'text-rose-600 bg-rose-50 border-rose-300';
+      case 'moderate': return 'text-amber-600 bg-amber-50 border-amber-300';
+      case 'low': return 'text-emerald-600 bg-emerald-50 border-emerald-300';
+    }
+  };
+
+  const getRiskScoreLabel = (level: RiskScore['level']) => {
+    switch (level) {
+      case 'critical': return 'Critical Risk';
+      case 'high': return 'High Risk';
+      case 'moderate': return 'Moderate Risk';
+      case 'low': return 'Low Risk';
     }
   };
 
@@ -198,6 +218,33 @@ const Analyze = () => {
           {/* Results Section */}
           {result && result.success && (
             <div className="mx-auto max-w-4xl space-y-8 animate-slide-up">
+              {/* Risk Score Summary */}
+              <div className={cn("card-professional border-2", getRiskScoreColor(result.riskScore.level))}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "flex items-center justify-center w-16 h-16 rounded-full text-2xl font-bold",
+                      getRiskScoreColor(result.riskScore.level)
+                    )}>
+                      {result.riskScore.score}
+                    </div>
+                    <div>
+                      <h2 className="font-heading text-xl font-semibold">
+                        {getRiskScoreLabel(result.riskScore.level)}
+                      </h2>
+                      <p className="text-sm text-muted-foreground">Overall Risk Score</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 text-xs">
+                    <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700">0-19 Low</span>
+                    <span className="px-2 py-1 rounded bg-amber-100 text-amber-700">20-44 Moderate</span>
+                    <span className="px-2 py-1 rounded bg-rose-100 text-rose-700">45-69 High</span>
+                    <span className="px-2 py-1 rounded bg-destructive/10 text-destructive">70+ Critical</span>
+                  </div>
+                </div>
+                <p className="text-sm leading-relaxed">{result.riskScore.summary}</p>
+              </div>
+
               {/* Summary Card */}
               <div className="card-professional">
                 <div className="flex items-center gap-3 mb-4">
