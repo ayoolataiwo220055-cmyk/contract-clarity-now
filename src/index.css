@@ -138,10 +138,52 @@
   }
 
   .hover-lift {
-    @apply transition-transform duration-200 ease-out;
+    @apply transition-all duration-200 ease-out;
   }
 
   .hover-lift:hover {
     @apply -translate-y-0.5;
+  }
+
+  /* Page entry animations */
+  .page-enter {
+    @apply opacity-0;
+    animation: fade-in-up 0.35s ease-out 0.05s forwards;
+  }
+
+  /* Staggered card animations */
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .card-hover:hover {
+    @apply -translate-y-0.5;
+    box-shadow: 0 8px 16px -4px hsl(210 20% 50% / 0.12), 0 4px 6px -4px hsl(210 20% 50% / 0.1);
+  }
+
+  /* Upload zone hover */
+  .upload-hover {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .upload-hover:hover {
+    box-shadow: 0 4px 12px -2px hsl(179 46% 33% / 0.1);
+  }
+
+  /* Button press effect */
+  .btn-press:active {
+    @apply scale-[0.98];
+  }
+
+  /* Processing pulse */
+  .processing-pulse {
+    animation: pulse 1.5s ease-in-out infinite;
   }
 }

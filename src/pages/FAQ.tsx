@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
+import AnimatedPage from "@/components/layout/AnimatedPage";
 import { cn } from "@/lib/utils";
 
 interface FAQItem {
@@ -60,58 +61,63 @@ const FAQ = () => {
 
   return (
     <PageLayout>
-      <section className="py-12 lg:py-16">
-        <div className="section-container">
-          {/* Page Header */}
-          <div className="mx-auto max-w-2xl text-center mb-12">
-            <h1 className="font-heading text-3xl sm:text-4xl font-semibold text-foreground mb-4">
-              Frequently Asked Questions
-            </h1>
-            <p className="text-muted-foreground">
-              Find answers to common questions about Employ Know and how it protects your privacy.
-            </p>
-          </div>
+      <AnimatedPage>
+        <section className="py-12 lg:py-16">
+          <div className="section-container">
+            {/* Page Header */}
+            <div className="mx-auto max-w-2xl text-center mb-12">
+              <h1 className="font-heading text-3xl sm:text-4xl font-semibold text-foreground mb-4">
+                Frequently Asked Questions
+              </h1>
+              <p className="text-muted-foreground">
+                Find answers to common questions about Employ Know and how it protects your privacy.
+              </p>
+            </div>
 
-          {/* FAQ Items */}
-          <div className="mx-auto max-w-3xl">
-            <div className="space-y-3">
-              {faqItems.map((item, index) => (
-                <div
-                  key={index}
-                  className="card-professional overflow-hidden"
-                >
-                  <button
-                    onClick={() => toggleItem(index)}
-                    className="w-full flex items-center justify-between text-left py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
-                    aria-expanded={openIndex === index}
-                  >
-                    <span className="font-medium text-foreground pr-4">
-                      {item.question}
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        "h-5 w-5 text-muted-foreground transition-transform duration-200 flex-shrink-0",
-                        openIndex === index && "rotate-180"
-                      )}
-                      aria-hidden="true"
-                    />
-                  </button>
+            {/* FAQ Items */}
+            <div className="mx-auto max-w-3xl">
+              <div className="space-y-3">
+                {faqItems.map((item, index) => (
                   <div
-                    className={cn(
-                      "overflow-hidden transition-all duration-200 ease-out",
-                      openIndex === index ? "max-h-96 opacity-100 pb-4" : "max-h-0 opacity-0"
-                    )}
+                    key={index}
+                    className="card-professional card-hover overflow-hidden opacity-0 animate-fade-in-up"
+                    style={{ animationDelay: `${0.05 * (index + 1)}s` }}
                   >
-                    <p className="text-muted-foreground leading-relaxed">
-                      {item.answer}
-                    </p>
+                    <button
+                      onClick={() => toggleItem(index)}
+                      className="w-full flex items-center justify-between text-left py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded transition-colors duration-200"
+                      aria-expanded={openIndex === index}
+                    >
+                      <span className="font-medium text-foreground pr-4">
+                        {item.question}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-5 w-5 text-muted-foreground transition-transform duration-250 ease-out flex-shrink-0",
+                          openIndex === index && "rotate-180"
+                        )}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <div
+                      className={cn(
+                        "overflow-hidden transition-all duration-250 ease-out",
+                        openIndex === index 
+                          ? "max-h-96 opacity-100 pb-4" 
+                          : "max-h-0 opacity-0"
+                      )}
+                    >
+                      <p className="text-muted-foreground leading-relaxed">
+                        {item.answer}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedPage>
     </PageLayout>
   );
 };
