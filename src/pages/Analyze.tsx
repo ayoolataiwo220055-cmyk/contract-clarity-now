@@ -349,7 +349,7 @@ const Analyze = () => {
                           Applicable Sentence(s):
                         </p>
                         <div className="space-y-2">
-                          {clause.sentences.map((sentence, sIndex) => (
+                          {(clause.sentences || []).map((sentence, sIndex) => (
                             <blockquote
                               key={sIndex}
                               className="pl-3 border-l-2 border-accent/40 text-sm text-foreground/90 leading-relaxed italic"
