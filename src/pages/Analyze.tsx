@@ -93,7 +93,28 @@ const Analyze = () => {
       case 'benefits': return 'bg-cyan-100 text-cyan-700';
       case 'non-solicitation': return 'bg-orange-100 text-orange-700';
       case 'relocation': return 'bg-amber-100 text-amber-700';
+      case 'dispute-resolution': return 'bg-slate-100 text-slate-700';
+      case 'intellectual-property': return 'bg-indigo-100 text-indigo-700';
+      case 'probation': return 'bg-teal-100 text-teal-700';
+      case 'overtime': return 'bg-lime-100 text-lime-700';
       default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getCategoryLabel = (category: ClauseAnalysis['category']) => {
+    switch (category) {
+      case 'compensation': return 'Compensation';
+      case 'termination': return 'Termination';
+      case 'confidentiality': return 'Confidentiality';
+      case 'non-compete': return 'Non-Compete';
+      case 'benefits': return 'Benefits';
+      case 'non-solicitation': return 'Non-Solicitation';
+      case 'relocation': return 'Relocation';
+      case 'dispute-resolution': return 'Dispute Resolution';
+      case 'intellectual-property': return 'Intellectual Property';
+      case 'probation': return 'Probation';
+      case 'overtime': return 'Overtime';
+      default: return 'Other';
     }
   };
 
@@ -311,16 +332,33 @@ const Analyze = () => {
                 <h2 className="font-heading text-xl font-semibold text-foreground mb-4">
                   Identified Clauses
                 </h2>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {result.clauses.map((clause, index) => (
-                    <div key={index} className="p-4 bg-muted/30 rounded-md">
-                      <div className="flex items-center gap-2 mb-2">
+                    <div key={index} className="border border-border rounded-md overflow-hidden">
+                      {/* Clause Header */}
+                      <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border">
                         <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", getCategoryColor(clause.category))}>
-                          {clause.category}
+                          {getCategoryLabel(clause.category)}
                         </span>
-                        <h3 className="font-medium text-foreground">{clause.title}</h3>
+                        <h3 className="font-semibold text-foreground">{clause.title}</h3>
                       </div>
-                      <p className="text-sm text-muted-foreground">{clause.content}</p>
+                      
+                      {/* Applicable Sentences */}
+                      <div className="px-4 py-3">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                          Applicable Sentence(s):
+                        </p>
+                        <div className="space-y-2">
+                          {clause.sentences.map((sentence, sIndex) => (
+                            <blockquote
+                              key={sIndex}
+                              className="pl-3 border-l-2 border-accent/40 text-sm text-foreground/90 leading-relaxed italic"
+                            >
+                              "{sentence}"
+                            </blockquote>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
