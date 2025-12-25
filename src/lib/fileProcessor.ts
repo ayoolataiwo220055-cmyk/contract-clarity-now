@@ -18,8 +18,8 @@ export interface RiskScore {
 
 export interface ClauseAnalysis {
   title: string;
-  content: string;
-  category: 'compensation' | 'termination' | 'confidentiality' | 'non-compete' | 'benefits' | 'non-solicitation' | 'relocation' | 'other';
+  category: 'compensation' | 'termination' | 'confidentiality' | 'non-compete' | 'benefits' | 'non-solicitation' | 'relocation' | 'dispute-resolution' | 'intellectual-property' | 'probation' | 'overtime' | 'other';
+  sentences: string[]; // Actual sentences from the document
 }
 
 export interface RiskArea {
@@ -150,28 +150,67 @@ async function extractTxtText(file: File): Promise<string> {
   return await file.text();
 }
 
+// Helper function to segment text into sentences
+function segmentSentences(text: string): string[] {
+  // Split by common sentence terminators, keeping the terminator
+  const rawSentences = text.split(/(?<=[.!?])\s+/);
+  
+  // Clean up and filter sentences
+  return rawSentences
+    .map(s => s.trim())
+    .filter(s => s.length > 10) // Filter out very short fragments
+    .map(s => s.replace(/\s+/g, ' ')); // Normalize whitespace
+}
+
+// Helper function to find sentences containing any of the keywords
+function findMatchingSentences(sentences: string[], keywords: string[], maxSentences: number = 3): string[] {
+  const matches: string[] = [];
+  
+  for (const sentence of sentences) {
+    const lowerSentence = sentence.toLowerCase();
+    for (const keyword of keywords) {
+      if (lowerSentence.includes(keyword.toLowerCase()) && !matches.includes(sentence)) {
+        matches.push(sentence);
+        break;
+      }
+    }
+    if (matches.length >= maxSentences) break;
+  }
+  
+  return matches;
+}
+
 function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: RiskArea[]; riskScore: RiskScore } {
   const clauses: ClauseAnalysis[] = [];
   const riskAreas: RiskArea[] = [];
   
   const lowerText = text.toLowerCase();
+  const sentences = segmentSentences(text);
   
   // Detect compensation clauses
-  if (lowerText.includes('salary') || lowerText.includes('compensation') || lowerText.includes('wage') || lowerText.includes('pay')) {
-    clauses.push({
-      title: 'Compensation Terms',
-      content: 'Salary and compensation details detected in document.',
-      category: 'compensation',
-    });
+  const compensationKeywords = ['salary', 'compensation', 'wage', 'pay', 'remuneration', 'bonus', 'earnings'];
+  if (compensationKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, compensationKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Compensation Clause',
+        category: 'compensation',
+        sentences: matchedSentences,
+      });
+    }
   }
   
   // Detect termination clauses
-  if (lowerText.includes('termination') || lowerText.includes('notice period') || lowerText.includes('dismissal')) {
-    clauses.push({
-      title: 'Termination Conditions',
-      content: 'Employment termination provisions identified.',
-      category: 'termination',
-    });
+  const terminationKeywords = ['termination', 'terminate', 'notice period', 'dismissal', 'end of employment', 'resignation'];
+  if (terminationKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, terminationKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Termination Clause',
+        category: 'termination',
+        sentences: matchedSentences,
+      });
+    }
     
     if (lowerText.includes('immediate termination') || lowerText.includes('at will') || lowerText.includes('at-will')) {
       riskAreas.push({
@@ -184,21 +223,29 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect confidentiality clauses
-  if (lowerText.includes('confidential') || lowerText.includes('non-disclosure') || lowerText.includes('nda') || lowerText.includes('proprietary')) {
-    clauses.push({
-      title: 'Confidentiality Agreement',
-      content: 'Non-disclosure and confidentiality requirements present.',
-      category: 'confidentiality',
-    });
+  const confidentialityKeywords = ['confidential', 'non-disclosure', 'nda', 'proprietary', 'trade secret', 'disclose'];
+  if (confidentialityKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, confidentialityKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Confidentiality Clause',
+        category: 'confidentiality',
+        sentences: matchedSentences,
+      });
+    }
   }
   
   // Detect non-compete clauses
-  if (lowerText.includes('non-compete') || lowerText.includes('non compete') || lowerText.includes('compete with') || lowerText.includes('competitive business')) {
-    clauses.push({
-      title: 'Non-Compete Clause',
-      content: 'Restrictions on future employment detected.',
-      category: 'non-compete',
-    });
+  const nonCompeteKeywords = ['non-compete', 'non compete', 'compete with', 'competitive business', 'competing'];
+  if (nonCompeteKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, nonCompeteKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Non-Compete Clause',
+        category: 'non-compete',
+        sentences: matchedSentences,
+      });
+    }
     
     riskAreas.push({
       severity: 'high',
@@ -208,22 +255,30 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
     });
   }
   
-  // Detect benefits
-  if (lowerText.includes('benefit') || lowerText.includes('insurance') || lowerText.includes('vacation') || lowerText.includes('401k') || lowerText.includes('pension')) {
-    clauses.push({
-      title: 'Benefits Package',
-      content: 'Employee benefits and perks mentioned.',
-      category: 'benefits',
-    });
+  // Detect benefits clauses
+  const benefitsKeywords = ['benefit', 'insurance', 'vacation', '401k', 'pension', 'health plan', 'paid leave'];
+  if (benefitsKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, benefitsKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Benefits Clause',
+        category: 'benefits',
+        sentences: matchedSentences,
+      });
+    }
   }
   
   // Detect overtime clauses
-  if (lowerText.includes('overtime') || lowerText.includes('extra hours') || lowerText.includes('time and a half') || lowerText.includes('work hours') || lowerText.includes('additional hours')) {
-    clauses.push({
-      title: 'Overtime Provisions',
-      content: 'Overtime work requirements and compensation terms identified.',
-      category: 'other',
-    });
+  const overtimeKeywords = ['overtime', 'extra hours', 'time and a half', 'work hours', 'additional hours', 'working hours'];
+  if (overtimeKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, overtimeKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Overtime Clause',
+        category: 'overtime',
+        sentences: matchedSentences,
+      });
+    }
     
     if (lowerText.includes('exempt') || lowerText.includes('no overtime pay') || lowerText.includes('unpaid overtime') || lowerText.includes('salaried exempt')) {
       riskAreas.push({
@@ -236,12 +291,16 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect probation period clauses
-  if (lowerText.includes('probation') || lowerText.includes('probationary period') || lowerText.includes('trial period') || lowerText.includes('introductory period') || lowerText.includes('evaluation period')) {
-    clauses.push({
-      title: 'Probation Period',
-      content: 'Probationary or trial employment period terms detected.',
-      category: 'other',
-    });
+  const probationKeywords = ['probation', 'probationary period', 'trial period', 'introductory period', 'evaluation period'];
+  if (probationKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, probationKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Probation Period Clause',
+        category: 'probation',
+        sentences: matchedSentences,
+      });
+    }
     
     if (lowerText.includes('reduced benefits') || lowerText.includes('no benefits during') || lowerText.includes('limited benefits') || lowerText.includes('benefits begin after')) {
       riskAreas.push({
@@ -263,12 +322,16 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect intellectual property clauses
-  if (lowerText.includes('intellectual property') || lowerText.includes('invention') || lowerText.includes('work product') || lowerText.includes('copyright') || lowerText.includes('patent') || lowerText.includes('trade secret')) {
-    clauses.push({
-      title: 'Intellectual Property Rights',
-      content: 'IP ownership, invention assignment, and work product terms detected.',
-      category: 'other',
-    });
+  const ipKeywords = ['intellectual property', 'invention', 'work product', 'copyright', 'patent', 'trade secret', 'ip rights'];
+  if (ipKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, ipKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Intellectual Property Clause',
+        category: 'intellectual-property',
+        sentences: matchedSentences,
+      });
+    }
     
     if (lowerText.includes('all inventions') || lowerText.includes('employer owns') || lowerText.includes('assign all rights') || lowerText.includes('work for hire') || lowerText.includes('company property')) {
       riskAreas.push({
@@ -290,12 +353,16 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect non-solicitation clauses
-  if (lowerText.includes('non-solicitation') || lowerText.includes('non solicitation') || lowerText.includes('solicit employees') || lowerText.includes('solicit clients') || lowerText.includes('solicit customers') || lowerText.includes('recruit employees') || lowerText.includes('poach')) {
-    clauses.push({
-      title: 'Non-Solicitation Clause',
-      content: 'Restrictions on soliciting employees, clients, or customers after employment.',
-      category: 'non-solicitation',
-    });
+  const nonSolicitKeywords = ['non-solicitation', 'non solicitation', 'solicit employees', 'solicit clients', 'solicit customers', 'recruit employees', 'poach'];
+  if (nonSolicitKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, nonSolicitKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Non-Solicitation Clause',
+        category: 'non-solicitation',
+        sentences: matchedSentences,
+      });
+    }
     
     if (lowerText.includes('permanent') || lowerText.includes('indefinite') || lowerText.includes('forever')) {
       riskAreas.push({
@@ -315,24 +382,27 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
   }
   
   // Detect relocation requirements
-  if (lowerText.includes('relocation') || lowerText.includes('relocate') || lowerText.includes('transfer to another') || lowerText.includes('reassignment') || lowerText.includes('work location') || lowerText.includes('geographic mobility') || lowerText.includes('move to another')) {
-    clauses.push({
-      title: 'Relocation Requirements',
-      content: 'Terms related to potential job relocation or geographic mobility detected.',
-      category: 'relocation',
-    });
+  const relocationKeywords = ['relocation', 'relocate', 'transfer to another', 'reassignment', 'work location', 'geographic mobility', 'move to another'];
+  if (relocationKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, relocationKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Relocation Clause',
+        category: 'relocation',
+        sentences: matchedSentences,
+      });
+    }
     
     if (lowerText.includes('required to relocate') || lowerText.includes('must relocate') || lowerText.includes('mandatory relocation') || lowerText.includes('obligation to relocate')) {
       riskAreas.push({
         severity: 'high',
         title: 'Mandatory Relocation',
-        description: 'This contract may require you to relocate to a different location at the employer\'s request.',
+        description: "This contract may require you to relocate to a different location at the employer's request.",
         recommendation: 'Clarify relocation terms, notice periods, and what happens if you decline a relocation request.',
       });
     }
     
     if (lowerText.includes('relocation assistance') || lowerText.includes('relocation package') || lowerText.includes('moving expenses') || lowerText.includes('relocation reimbursement')) {
-      // Check for clawback provisions
       if (lowerText.includes('repay') || lowerText.includes('reimburse') || lowerText.includes('clawback') || lowerText.includes('pay back') || lowerText.includes('return the')) {
         riskAreas.push({
           severity: 'medium',
@@ -344,31 +414,45 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
     }
   }
   
-  // Add a general note if minimal content detected
+  // Detect dispute resolution clauses
+  const disputeKeywords = ['arbitration', 'dispute resolution', 'mediation', 'litigation', 'jurisdiction', 'governing law', 'legal proceedings'];
+  if (disputeKeywords.some(kw => lowerText.includes(kw))) {
+    const matchedSentences = findMatchingSentences(sentences, disputeKeywords);
+    if (matchedSentences.length > 0) {
+      clauses.push({
+        title: 'Dispute Resolution Clause',
+        category: 'dispute-resolution',
+        sentences: matchedSentences,
+      });
+    }
+    
+    if (lowerText.includes('arbitration') && !lowerText.includes('optional arbitration')) {
+      riskAreas.push({
+        severity: 'low',
+        title: 'Mandatory Arbitration',
+        description: 'Disputes may require resolution through arbitration rather than court.',
+        recommendation: 'Consider the implications of mandatory arbitration clauses.',
+      });
+    }
+  }
+  
+  // Add a general note if no clauses detected
   if (clauses.length === 0) {
     clauses.push({
       title: 'General Contract Content',
-      content: 'Document uploaded successfully. Review the extracted text below for details.',
       category: 'other',
+      sentences: ['Document uploaded successfully. No specific clause patterns were detected. Please review the extracted text below for details.'],
     });
   }
   
-  // Check for potentially concerning language
-  if (lowerText.includes('waive') || lowerText.includes('forfeit') || lowerText.includes('relinquish')) {
+  // Check for potentially concerning language (rights waiver)
+  const waiverKeywords = ['waive', 'forfeit', 'relinquish', 'give up rights'];
+  if (waiverKeywords.some(kw => lowerText.includes(kw))) {
     riskAreas.push({
       severity: 'medium',
       title: 'Rights Waiver Language',
       description: 'The contract contains language about waiving certain rights.',
       recommendation: 'Understand exactly what rights you may be giving up.',
-    });
-  }
-  
-  if (lowerText.includes('arbitration') && !lowerText.includes('optional arbitration')) {
-    riskAreas.push({
-      severity: 'low',
-      title: 'Mandatory Arbitration',
-      description: 'Disputes may require resolution through arbitration rather than court.',
-      recommendation: 'Consider the implications of mandatory arbitration clauses.',
     });
   }
   
