@@ -20,6 +20,7 @@ export interface ClauseAnalysis {
   title: string;
   category: 'compensation' | 'termination' | 'confidentiality' | 'non-compete' | 'benefits' | 'non-solicitation' | 'relocation' | 'dispute-resolution' | 'intellectual-property' | 'probation' | 'overtime' | 'other';
   sentences: string[]; // Actual sentences from the document
+  keywords: string[]; // Keywords that matched this clause
 }
 
 export interface RiskArea {
@@ -196,6 +197,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Compensation Clause',
         category: 'compensation',
         sentences: matchedSentences,
+        keywords: compensationKeywords,
       });
     }
   }
@@ -209,6 +211,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Termination Clause',
         category: 'termination',
         sentences: matchedSentences,
+        keywords: terminationKeywords,
       });
     }
     
@@ -231,6 +234,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Confidentiality Clause',
         category: 'confidentiality',
         sentences: matchedSentences,
+        keywords: confidentialityKeywords,
       });
     }
   }
@@ -244,6 +248,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Non-Compete Clause',
         category: 'non-compete',
         sentences: matchedSentences,
+        keywords: nonCompeteKeywords,
       });
     }
     
@@ -264,6 +269,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Benefits Clause',
         category: 'benefits',
         sentences: matchedSentences,
+        keywords: benefitsKeywords,
       });
     }
   }
@@ -277,6 +283,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Overtime Clause',
         category: 'overtime',
         sentences: matchedSentences,
+        keywords: overtimeKeywords,
       });
     }
     
@@ -299,6 +306,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Probation Period Clause',
         category: 'probation',
         sentences: matchedSentences,
+        keywords: probationKeywords,
       });
     }
     
@@ -330,6 +338,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Intellectual Property Clause',
         category: 'intellectual-property',
         sentences: matchedSentences,
+        keywords: ipKeywords,
       });
     }
     
@@ -361,6 +370,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Non-Solicitation Clause',
         category: 'non-solicitation',
         sentences: matchedSentences,
+        keywords: nonSolicitKeywords,
       });
     }
     
@@ -390,6 +400,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Relocation Clause',
         category: 'relocation',
         sentences: matchedSentences,
+        keywords: relocationKeywords,
       });
     }
     
@@ -423,6 +434,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         title: 'Dispute Resolution Clause',
         category: 'dispute-resolution',
         sentences: matchedSentences,
+        keywords: disputeKeywords,
       });
     }
     
@@ -442,6 +454,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
       title: 'General Contract Content',
       category: 'other',
       sentences: ['Document uploaded successfully. No specific clause patterns were detected. Please review the extracted text below for details.'],
+      keywords: [],
     });
   }
   
