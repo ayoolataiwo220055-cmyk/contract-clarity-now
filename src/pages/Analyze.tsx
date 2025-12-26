@@ -1,11 +1,13 @@
 import { useState, useCallback } from "react";
-import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X, Shield, Download } from "lucide-react";
+import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X, Shield, Download, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import PageLayout from "@/components/layout/PageLayout";
 import AnimatedPage from "@/components/layout/AnimatedPage";
 import AnalysisSkeleton from "@/components/ui/AnalysisSkeleton";
 import { validateFile, processFile, ProcessingResult, ClauseAnalysis, RiskArea, RiskScore } from "@/lib/fileProcessor";
 import { cn } from "@/lib/utils";
+import jsPDF from "jspdf";
 
 const Analyze = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -13,6 +15,45 @@ const Analyze = () => {
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [expandedClauses, setExpandedClauses] = useState<Set<number>>(new Set());
+
+  const toggleClause = (index: number) => {
+    setExpandedClauses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const expandAllClauses = () => {
+    if (result) {
+      setExpandedClauses(new Set(result.clauses.map((_, i) => i)));
+    }
+  };
+
+  const collapseAllClauses = () => {
+    setExpandedClauses(new Set());
+  };
+
+  // Highlight keywords in a sentence
+  const highlightKeywords = (sentence: string, keywords: string[]) => {
+    if (!keywords || keywords.length === 0) return sentence;
+    
+    const regex = new RegExp(`(${keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+    const parts = sentence.split(regex);
+    
+    return parts.map((part, i) => {
+      const isKeyword = keywords.some(kw => part.toLowerCase() === kw.toLowerCase());
+      if (isKeyword) {
+        return <mark key={i} className="bg-accent/20 text-accent-foreground px-0.5 rounded font-medium not-italic">{part}</mark>;
+      }
+      return part;
+    });
+  };
 
   const handleFileSelect = useCallback((selectedFile: File) => {
     const validation = validateFile(selectedFile);
@@ -141,55 +182,103 @@ const Analyze = () => {
   const generateReport = useCallback(() => {
     if (!result) return;
 
-    const reportContent = `
-EMPLOY KNOW - CONTRACT ANALYSIS REPORT
-=======================================
-Generated: ${new Date().toLocaleString()}
-File: ${result.fileName}
-File Type: ${result.fileType}
-${result.pageCount ? `Pages: ${result.pageCount}` : ''}
-Words: ${result.wordCount.toLocaleString()}
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 20;
 
-RISK ASSESSMENT
----------------
-Overall Risk Score: ${result.riskScore.score}/100 (${getRiskScoreLabel(result.riskScore.level)})
-${result.riskScore.summary}
+    // Helper function to add text with word wrap
+    const addText = (text: string, fontSize: number = 10, isBold: boolean = false) => {
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+      const lines = doc.splitTextToSize(text, contentWidth);
+      
+      // Check if we need a new page
+      if (y + lines.length * (fontSize * 0.4) > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.text(lines, margin, y);
+      y += lines.length * (fontSize * 0.4) + 4;
+    };
 
-${result.riskAreas.length > 0 ? `
-IDENTIFIED RISK AREAS
----------------------
-${result.riskAreas.map((risk, i) => `
-${i + 1}. [${risk.severity.toUpperCase()}] ${risk.title}
-   Description: ${risk.description}
-   Recommendation: ${risk.recommendation}
-`).join('')}` : ''}
+    const addSection = (title: string) => {
+      y += 6;
+      if (y > doc.internal.pageSize.getHeight() - 40) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 42, 68); // Navy blue
+      doc.text(title, margin, y);
+      y += 8;
+      doc.setDrawColor(45, 122, 123); // Teal
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 8;
+      doc.setTextColor(0, 0, 0);
+    };
 
-IDENTIFIED CLAUSES
-------------------
-${result.clauses.map((clause, i) => `
-${i + 1}. ${clause.title} [${getCategoryLabel(clause.category)}]
-   Applicable Sentences:
-${(clause.sentences || []).map(s => `   - "${s}"`).join('\n')}
-`).join('')}
+    // Header
+    doc.setFillColor(15, 42, 68);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EMPLOY KNOW', margin, 18);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Contract Analysis Report', margin, 28);
+    y = 45;
+    doc.setTextColor(0, 0, 0);
 
-EXTRACTED TEXT
---------------
-${result.text}
+    // Document Info
+    addText(`Generated: ${new Date().toLocaleString()}`, 10);
+    addText(`File: ${result.fileName}`, 10);
+    addText(`File Type: ${result.fileType}`, 10);
+    if (result.pageCount) addText(`Pages: ${result.pageCount}`, 10);
+    addText(`Words: ${result.wordCount.toLocaleString()}`, 10);
 
-=======================================
-This report was generated by Employ Know.
-For informational purposes only - not legal advice.
-    `.trim();
+    // Risk Assessment
+    addSection('RISK ASSESSMENT');
+    const riskLevel = getRiskScoreLabel(result.riskScore.level);
+    addText(`Overall Risk Score: ${result.riskScore.score}/100 (${riskLevel})`, 12, true);
+    addText(result.riskScore.summary, 10);
 
-    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `contract-analysis-${result.fileName.replace(/\.[^/.]+$/, '')}-${Date.now()}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // Risk Areas
+    if (result.riskAreas.length > 0) {
+      addSection('IDENTIFIED RISK AREAS');
+      result.riskAreas.forEach((risk, i) => {
+        addText(`${i + 1}. [${risk.severity.toUpperCase()}] ${risk.title}`, 11, true);
+        addText(`Description: ${risk.description}`, 10);
+        addText(`Recommendation: ${risk.recommendation}`, 10);
+        y += 2;
+      });
+    }
+
+    // Clauses
+    addSection('IDENTIFIED CLAUSES');
+    result.clauses.forEach((clause, i) => {
+      addText(`${i + 1}. ${clause.title} [${getCategoryLabel(clause.category)}]`, 11, true);
+      addText('Applicable Sentences:', 10, true);
+      (clause.sentences || []).forEach(sentence => {
+        addText(`• "${sentence}"`, 9);
+      });
+      y += 3;
+    });
+
+    // Footer
+    y += 10;
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128);
+    doc.text('This report was generated by Employ Know.', margin, y);
+    y += 5;
+    doc.text('For informational purposes only - not legal advice.', margin, y);
+
+    // Save the PDF
+    doc.save(`contract-analysis-${result.fileName.replace(/\.[^/.]+$/, '')}-${Date.now()}.pdf`);
   }, [result]);
 
   return (
@@ -397,69 +486,90 @@ For informational purposes only - not legal advice.
 
                 {/* Identified Clauses */}
                 <div className="card-professional opacity-0 animate-fade-in-up stagger-3">
-                  <h2 className="font-heading text-xl font-semibold text-foreground mb-4">
-                    Identified Clauses
-                  </h2>
-                  <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-heading text-xl font-semibold text-foreground">
+                      Identified Clauses
+                    </h2>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={expandAllClauses}
+                        className="text-xs"
+                      >
+                        Expand All
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={collapseAllClauses}
+                        className="text-xs"
+                      >
+                        Collapse All
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
                     {result.clauses.map((clause, index) => (
-                      <div 
-                        key={index} 
+                      <Collapsible
+                        key={index}
+                        open={expandedClauses.has(index)}
+                        onOpenChange={() => toggleClause(index)}
                         className="border border-border rounded-md overflow-hidden opacity-0 animate-fade-in-up"
                         style={{ animationDelay: `${0.05 * (index + 1)}s` }}
                       >
-                        {/* Clause Header */}
-                        <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border">
-                          <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", getCategoryColor(clause.category))}>
-                            {getCategoryLabel(clause.category)}
-                          </span>
-                          <h3 className="font-semibold text-foreground">{clause.title}</h3>
-                        </div>
+                        {/* Clause Header - Clickable */}
+                        <CollapsibleTrigger asChild>
+                          <button className="flex items-center justify-between w-full px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors border-b border-border">
+                            <div className="flex items-center gap-3">
+                              <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", getCategoryColor(clause.category))}>
+                                {getCategoryLabel(clause.category)}
+                              </span>
+                              <h3 className="font-semibold text-foreground text-left">{clause.title}</h3>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <span className="text-xs">{(clause.sentences || []).length} sentence(s)</span>
+                              {expandedClauses.has(index) ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </div>
+                          </button>
+                        </CollapsibleTrigger>
                         
-                        {/* Applicable Sentences */}
-                        <div className="px-4 py-3">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                            Applicable Sentence(s):
-                          </p>
-                          <div className="space-y-2">
-                            {(clause.sentences || []).map((sentence, sIndex) => (
-                              <blockquote
-                                key={sIndex}
-                                className="pl-3 border-l-2 border-accent/40 text-sm text-foreground/90 leading-relaxed italic"
-                              >
-                                "{sentence}"
-                              </blockquote>
-                            ))}
+                        {/* Applicable Sentences - Collapsible */}
+                        <CollapsibleContent className="animate-accordion-down">
+                          <div className="px-4 py-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                              Applicable Sentence(s):
+                            </p>
+                            <div className="space-y-2">
+                              {(clause.sentences || []).map((sentence, sIndex) => (
+                                <blockquote
+                                  key={sIndex}
+                                  className="pl-3 border-l-2 border-accent/40 text-sm text-foreground/90 leading-relaxed italic"
+                                >
+                                  "{highlightKeywords(sentence, clause.keywords || [])}"
+                                </blockquote>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     ))}
                   </div>
                 </div>
 
-                {/* Extracted Text Preview */}
-                <div className="card-professional opacity-0 animate-fade-in-up stagger-4">
-                  <h2 className="font-heading text-xl font-semibold text-foreground mb-4">
-                    Extracted Text Preview
-                  </h2>
-                  <div className="max-h-96 overflow-y-auto p-4 bg-muted/30 rounded-md">
-                    <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-body leading-relaxed">
-                      {result.text.length > 5000 
-                        ? result.text.substring(0, 5000) + '\n\n[...truncated for display]' 
-                        : result.text || 'No text could be extracted from this document.'
-                      }
-                    </pre>
-                  </div>
-                </div>
-
                 {/* Download Report Section */}
-                <div className="card-professional opacity-0 animate-fade-in-up stagger-5 border-accent/20">
+                <div className="card-professional opacity-0 animate-fade-in-up stagger-4 border-accent/20">
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
                       <h2 className="font-heading text-xl font-semibold text-foreground mb-1">
                         Download Analysis Report
                       </h2>
                       <p className="text-sm text-muted-foreground">
-                        Save a complete text report of this analysis for your records.
+                        Save a complete PDF report of this analysis for your records.
                       </p>
                     </div>
                     <Button
@@ -469,7 +579,7 @@ For informational purposes only - not legal advice.
                       className="gap-2"
                     >
                       <Download className="h-4 w-4" />
-                      Download Report
+                      Download PDF Report
                     </Button>
                   </div>
                 </div>
