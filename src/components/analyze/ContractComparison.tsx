@@ -9,7 +9,7 @@ import ConfidenceIndicator from "@/components/ui/ConfidenceIndicator";
 import Disclaimer from "@/components/ui/Disclaimer";
 
 interface ComparisonContract {
-  file: File;
+  file: File | null;
   result: ProcessingResult | null;
   isProcessing: boolean;
   error: string | null;
@@ -53,8 +53,8 @@ const getCategoryColor = (category: ClauseAnalysis['category']) => {
 
 export const ContractComparison = () => {
   const [contracts, setContracts] = useState<ComparisonContract[]>([
-    { file: null as any, result: null, isProcessing: false, error: null },
-    { file: null as any, result: null, isProcessing: false, error: null }
+    { file: null, result: null, isProcessing: false, error: null },
+    { file: null, result: null, isProcessing: false, error: null }
   ]);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
@@ -104,7 +104,7 @@ export const ContractComparison = () => {
   const handleRemove = (index: number) => {
     setContracts(prev => {
       const updated = [...prev];
-      updated[index] = { file: null as any, result: null, isProcessing: false, error: null };
+      updated[index] = { file: null, result: null, isProcessing: false, error: null };
       return updated;
     });
   };
