@@ -574,6 +574,38 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
     });
   }
   
+  // Detect custom clauses
+  try {
+    const customClausesJson = typeof window !== 'undefined' ? localStorage.getItem('contract-clarity-custom-clauses') : null;
+    if (customClausesJson) {
+      const customClauses = JSON.parse(customClausesJson);
+      for (const customClause of customClauses) {
+        const matchedSentences = findMatchingSentences(sentences, customClause.keywords, 3);
+        if (matchedSentences.length > 0) {
+          clauses.push({
+            title: customClause.name,
+            category: 'other',
+            sentences: matchedSentences,
+            keywords: customClause.keywords,
+            confidence: getConfidence(matchedSentences.length),
+          });
+          
+          // Add risk area if custom clause has high risk level
+          if (customClause.riskLevel === 'high') {
+            riskAreas.push({
+              severity: 'high',
+              title: `${customClause.name} - Custom Clause`,
+              description: customClause.description || 'Custom clause detected in contract.',
+              recommendation: 'Review this custom clause carefully against your industry standards and requirements.',
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error processing custom clauses:', error);
+  }
+  
   // Calculate risk score
   const riskScore = calculateRiskScore(riskAreas);
   

@@ -10,7 +10,10 @@ import ClauseTooltip from "@/components/ui/ClauseTooltip";
 import ConfidenceIndicator from "@/components/ui/ConfidenceIndicator";
 import Disclaimer from "@/components/ui/Disclaimer";
 import ContractComparison from "@/components/analyze/ContractComparison";
+import KeyDatesCalendar from "@/components/KeyDatesCalendar";
+import LegalTermHighlighter from "@/components/LegalTermHighlighter";
 import { validateFile, processFile, ProcessingResult, ClauseAnalysis, RiskArea, RiskScore } from "@/lib/fileProcessor";
+import { extractDatesFromText, ContractDate, saveDates } from "@/lib/dateExtractor";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 
@@ -22,6 +25,7 @@ const Analyze = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [expandedClauses, setExpandedClauses] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState("single");
+  const [contractDates, setContractDates] = useState<ContractDate[]>([]);
 
   // Clear data on page reload (automatic data reset)
   useEffect(() => {
@@ -121,6 +125,11 @@ const Analyze = () => {
         setError('Failed to process the document. The file may be corrupted or in an unsupported format.');
       } else {
         setResult(processingResult);
+        // Extract dates from the contract text
+        const extractedDates = extractDatesFromText(processingResult.text);
+        setContractDates(extractedDates);
+        // Save dates to localStorage
+        saveDates(extractedDates);
       }
     } catch {
       setError('An unexpected error occurred. Please try again with a different file.');
@@ -453,6 +462,16 @@ const Analyze = () => {
                       </div>
                     </div>
 
+                    {/* Key Dates Calendar */}
+                    {contractDates.length > 0 && (
+                      <div className="card-professional opacity-0 animate-fade-in-up stagger-1">
+                        <KeyDatesCalendar 
+                          dates={contractDates}
+                          onDatesChange={(updatedDates) => setContractDates(updatedDates)}
+                        />
+                      </div>
+                    )}
+
                     {/* Risk Areas */}
                     {result.riskAreas.length > 0 && (
                       <div className="card-professional opacity-0 animate-fade-in-up stagger-2">
@@ -523,7 +542,12 @@ const Analyze = () => {
                                       key={sIndex}
                                       className="pl-3 border-l-2 border-accent/40 text-sm text-foreground/90 leading-relaxed italic bg-accent/5 py-2 pr-2 rounded-r"
                                     >
-                                      "{highlightKeywords(sentence, clause.keywords || [])}"
+                                      "
+                                      <LegalTermHighlighter 
+                                        text={sentence}
+                                        className="contents"
+                                      />
+                                      "
                                     </blockquote>
                                   ))}
                                 </div>

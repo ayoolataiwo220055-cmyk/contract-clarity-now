@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Shield, Lock, Trash2, FileCheck, ArrowRight } from "lucide-react";
+import { Shield, Lock, Trash2, FileCheck, ArrowRight, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageLayout from "@/components/layout/PageLayout";
 import AnimatedPage from "@/components/layout/AnimatedPage";
@@ -120,17 +120,30 @@ const Index = () => {
             <p className="text-primary-foreground/80 mb-8 max-w-xl mx-auto">
               Get started in seconds. No registration, no data retention.
             </p>
-            <Button 
-              variant="outline" 
-              size="lg" 
-              asChild
-              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-none"
-            >
-              <Link to="/analyze">
-                Start Analysis
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                asChild
+                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-none"
+              >
+                <Link to="/analyze">
+                  Start Analysis
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                asChild
+                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-none"
+              >
+                <Link to="/glossary">
+                  Browse Glossary
+                  <BookOpen className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </section>
       </AnimatedPage>
