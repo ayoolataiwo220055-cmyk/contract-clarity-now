@@ -21,6 +21,8 @@ export interface ClauseAnalysis {
   category: 'compensation' | 'termination' | 'confidentiality' | 'non-compete' | 'benefits' | 'non-solicitation' | 'relocation' | 'dispute-resolution' | 'intellectual-property' | 'probation' | 'overtime' | 'other';
   sentences: string[]; // Actual sentences from the document
   keywords: string[]; // Keywords that matched this clause
+  section?: string; // Document section where clause was found
+  confidence: 'strong' | 'moderate' | 'weak'; // Match confidence
 }
 
 export interface RiskArea {
@@ -28,6 +30,12 @@ export interface RiskArea {
   title: string;
   description: string;
   recommendation: string;
+}
+
+export interface DocumentSection {
+  title: string;
+  startIndex: number;
+  endIndex: number;
 }
 
 const ALLOWED_TYPES = [
@@ -39,13 +47,21 @@ const ALLOWED_TYPES = [
 const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt'];
 
 export function validateFile(file: File): { valid: boolean; error?: string } {
+  // Check for empty files
+  if (file.size === 0) {
+    return {
+      valid: false,
+      error: 'The uploaded file is empty. Please select a file with content.',
+    };
+  }
+
   const extension = '.' + file.name.split('.').pop()?.toLowerCase();
   const isValidType = ALLOWED_TYPES.includes(file.type) || ALLOWED_EXTENSIONS.includes(extension);
   
   if (!isValidType) {
     return {
       valid: false,
-      error: 'Invalid file type. Please upload a PDF, DOCX, or TXT file.',
+      error: 'Unsupported file format. Please upload a PDF, DOCX, or TXT file.',
     };
   }
 
@@ -53,11 +69,81 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
   if (file.size > maxSize) {
     return {
       valid: false,
-      error: 'File size exceeds 10MB limit.',
+      error: 'File size exceeds 10MB limit. Please upload a smaller file.',
+    };
+  }
+
+  // Check for very small files (likely corrupted)
+  if (file.size < 50) {
+    return {
+      valid: false,
+      error: 'The file appears to be corrupted or incomplete. Please try a different file.',
     };
   }
 
   return { valid: true };
+}
+
+// Normalize and clean extracted text
+function normalizeText(text: string): string {
+  return text
+    // Fix encoding issues
+    .replace(/\u0000/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Normalize line breaks
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    // Fix multiple spaces
+    .replace(/[ \t]+/g, ' ')
+    // Fix multiple newlines
+    .replace(/\n{3,}/g, '\n\n')
+    // Trim lines
+    .split('\n')
+    .map(line => line.trim())
+    .join('\n')
+    .trim();
+}
+
+// Detect document sections (headings, numbered sections)
+function detectSections(text: string): DocumentSection[] {
+  const sections: DocumentSection[] = [];
+  const lines = text.split('\n');
+  let currentIndex = 0;
+
+  // Patterns for section detection
+  const sectionPatterns = [
+    /^(article|section|clause|part)\s+(\d+|[ivxlc]+)[\.:]/i,
+    /^(\d+)\.\s+[A-Z]/,
+    /^([A-Z][A-Z\s]+):?\s*$/,
+    /^(\d+\.\d+)\s+[A-Z]/,
+  ];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    for (const pattern of sectionPatterns) {
+      if (pattern.test(line) && line.length < 100) {
+        sections.push({
+          title: line,
+          startIndex: currentIndex,
+          endIndex: currentIndex + line.length
+        });
+        break;
+      }
+    }
+    currentIndex += lines[i].length + 1;
+  }
+
+  return sections;
+}
+
+// Find which section a sentence belongs to
+function findSectionForIndex(index: number, sections: DocumentSection[]): string | undefined {
+  for (let i = sections.length - 1; i >= 0; i--) {
+    if (index >= sections[i].startIndex) {
+      return sections[i].title;
+    }
+  }
+  return undefined;
 }
 
 // Load PDF.js from CDN
@@ -181,6 +267,13 @@ function findMatchingSentences(sentences: string[], keywords: string[], maxSente
   return matches;
 }
 
+// Helper function to determine confidence based on match count
+function getConfidence(matchCount: number): ClauseAnalysis['confidence'] {
+  if (matchCount >= 3) return 'strong';
+  if (matchCount >= 2) return 'moderate';
+  return 'weak';
+}
+
 function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: RiskArea[]; riskScore: RiskScore } {
   const clauses: ClauseAnalysis[] = [];
   const riskAreas: RiskArea[] = [];
@@ -198,6 +291,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'compensation',
         sentences: matchedSentences,
         keywords: compensationKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
   }
@@ -212,6 +306,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'termination',
         sentences: matchedSentences,
         keywords: terminationKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
     
@@ -235,6 +330,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'confidentiality',
         sentences: matchedSentences,
         keywords: confidentialityKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
   }
@@ -249,6 +345,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'non-compete',
         sentences: matchedSentences,
         keywords: nonCompeteKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
     
@@ -270,6 +367,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'benefits',
         sentences: matchedSentences,
         keywords: benefitsKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
   }
@@ -284,6 +382,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'overtime',
         sentences: matchedSentences,
         keywords: overtimeKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
     
@@ -307,6 +406,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'probation',
         sentences: matchedSentences,
         keywords: probationKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
     
@@ -339,6 +439,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'intellectual-property',
         sentences: matchedSentences,
         keywords: ipKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
     
@@ -371,6 +472,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'non-solicitation',
         sentences: matchedSentences,
         keywords: nonSolicitKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
     
@@ -401,6 +503,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'relocation',
         sentences: matchedSentences,
         keywords: relocationKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
     
@@ -435,6 +538,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
         category: 'dispute-resolution',
         sentences: matchedSentences,
         keywords: disputeKeywords,
+        confidence: getConfidence(matchedSentences.length),
       });
     }
     
@@ -455,6 +559,7 @@ function analyzeText(text: string): { clauses: ClauseAnalysis[]; riskAreas: Risk
       category: 'other',
       sentences: ['Document uploaded successfully. No specific clause patterns were detected. Please review the extracted text below for details.'],
       keywords: [],
+      confidence: 'weak',
     });
   }
   
