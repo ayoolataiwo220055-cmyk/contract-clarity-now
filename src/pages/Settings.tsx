@@ -8,7 +8,7 @@ import CustomClausesManager from "@/components/CustomClausesManager";
 const Settings = () => {
   return (
     <AnimatedPage>
-      <PageLayout title="Settings & Custom Clauses" description="Manage your preferences and create a library of custom contract clauses">
+      <PageLayout>
         <section className="py-12">
           <div className="section-container">
             <div className="mx-auto max-w-5xl">
