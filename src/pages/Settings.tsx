@@ -32,27 +32,9 @@ const Settings = () => {
                     </Button>
                   </div>
 
-                  <div className="card-professional p-6">
-                    <h3 className="text-md font-semibold mb-3">Application Settings</h3>
-                    <div className="space-y-3 text-sm text-muted-foreground">
-                      <div className="flex items-center justify-between">
-                        <span>Theme</span>
-                        <span className="text-foreground">System default</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Notifications</span>
-                        <span className="text-foreground">Enabled</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Language</span>
-                        <span className="text-foreground">English</span>
-                      </div>
-                    </div>
-                  </div>
+                  
 
                   <div className="card-professional p-6">
-                    <h3 className="text-md font-semibold mb-3">Custom Clauses</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Create and manage reusable clauses you can insert into contracts.</p>
                     <CustomClausesManager />
                   </div>
                 </div>
