@@ -1,19 +1,21 @@
 import { useState, useCallback, useEffect } from "react";
-import { Upload, FileText, Loader2, X, Shield, GitCompare } from "lucide-react";
+import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X, Shield, Download, ChevronDown, ChevronUp, GitCompare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import PageLayout from "@/components/layout/PageLayout";
 import AnimatedPage from "@/components/layout/AnimatedPage";
 import AnalysisSkeleton from "@/components/ui/AnalysisSkeleton";
+import ClauseTooltip from "@/components/ui/ClauseTooltip";
+import ConfidenceIndicator from "@/components/ui/ConfidenceIndicator";
 import Disclaimer from "@/components/ui/Disclaimer";
 import ContractComparison from "@/components/analyze/ContractComparison";
-import SectionedOutput from "@/components/analyze/SectionedOutput";
 import KeyDatesCalendar from "@/components/KeyDatesCalendar";
+import LegalTermHighlighter from "@/components/LegalTermHighlighter";
 import { validateFile, processFile, ProcessingResult, ClauseAnalysis, RiskArea, RiskScore } from "@/lib/fileProcessor";
 import { extractDatesFromText, ContractDate, saveDates } from "@/lib/dateExtractor";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
-import { detectContractType, getContractTypeLabel } from "@/lib/clauseCategories";
 
 const Analyze = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -21,6 +23,7 @@ const Analyze = () => {
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [expandedClauses, setExpandedClauses] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState("single");
   const [contractDates, setContractDates] = useState<ContractDate[]>([]);
 
@@ -34,6 +37,43 @@ const Analyze = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
+
+  const toggleClause = (index: number) => {
+    setExpandedClauses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const expandAllClauses = () => {
+    if (result) {
+      setExpandedClauses(new Set(result.clauses.map((_, i) => i)));
+    }
+  };
+
+  const collapseAllClauses = () => {
+    setExpandedClauses(new Set());
+  };
+
+  const highlightKeywords = (sentence: string, keywords: string[]) => {
+    if (!keywords || keywords.length === 0) return sentence;
+    
+    const regex = new RegExp(`(${keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+    const parts = sentence.split(regex);
+    
+    return parts.map((part, i) => {
+      const isKeyword = keywords.some(kw => part.toLowerCase() === kw.toLowerCase());
+      if (isKeyword) {
+        return <mark key={i} className="bg-accent/20 text-accent-foreground px-0.5 rounded font-medium not-italic">{part}</mark>;
+      }
+      return part;
+    });
+  };
 
   const handleFileSelect = useCallback((selectedFile: File) => {
     const validation = validateFile(selectedFile);
@@ -369,9 +409,62 @@ const Analyze = () => {
                     {/* Disclaimer */}
                     <Disclaimer />
 
+                    {/* Risk Score Summary */}
+                    <div className={cn("card-professional border-2 opacity-0 animate-scale-in", getRiskScoreColor(result.riskScore.level))}>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "flex items-center justify-center w-16 h-16 rounded-full text-2xl font-bold",
+                            getRiskScoreColor(result.riskScore.level)
+                          )}>
+                            {result.riskScore.score}
+                          </div>
+                          <div>
+                            <h2 className="font-heading text-xl font-semibold">{getRiskScoreLabel(result.riskScore.level)}</h2>
+                            <p className="text-sm text-muted-foreground">Overall Risk Score</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 text-xs">
+                          <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700">0-19 Low</span>
+                          <span className="px-2 py-1 rounded bg-amber-100 text-amber-700">20-44 Moderate</span>
+                          <span className="px-2 py-1 rounded bg-rose-100 text-rose-700">45-69 High</span>
+                          <span className="px-2 py-1 rounded bg-destructive/10 text-destructive">70+ Critical</span>
+                        </div>
+                      </div>
+                      <p className="text-sm leading-relaxed">{result.riskScore.summary}</p>
+                    </div>
+
+                    {/* Summary Card */}
+                    <div className="card-professional opacity-0 animate-fade-in-up stagger-1">
+                      <div className="flex items-center gap-3 mb-4">
+                        <CheckCircle className="h-5 w-5 text-accent" aria-hidden="true" />
+                        <h2 className="font-heading text-xl font-semibold text-foreground">Analysis Complete</h2>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                        <div className="p-3 bg-muted/50 rounded-md">
+                          <p className="text-2xl font-semibold text-foreground">{result.fileType}</p>
+                          <p className="text-xs text-muted-foreground">File Type</p>
+                        </div>
+                        {result.pageCount && (
+                          <div className="p-3 bg-muted/50 rounded-md">
+                            <p className="text-2xl font-semibold text-foreground">{result.pageCount}</p>
+                            <p className="text-xs text-muted-foreground">Pages</p>
+                          </div>
+                        )}
+                        <div className="p-3 bg-muted/50 rounded-md">
+                          <p className="text-2xl font-semibold text-foreground">{result.wordCount.toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground">Words</p>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-md">
+                          <p className="text-2xl font-semibold text-foreground">{result.clauses.length}</p>
+                          <p className="text-xs text-muted-foreground">Clauses Found</p>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Key Dates Calendar */}
                     {contractDates.length > 0 && (
-                      <div className="card-professional opacity-0 animate-fade-in-up">
+                      <div className="card-professional opacity-0 animate-fade-in-up stagger-1">
                         <KeyDatesCalendar 
                           dates={contractDates}
                           onDatesChange={(updatedDates) => setContractDates(updatedDates)}
@@ -379,16 +472,105 @@ const Analyze = () => {
                       </div>
                     )}
 
-                    {/* Sectioned Output View */}
-                    <SectionedOutput
-                      result={result}
-                      onGenerateReport={generateReport}
-                      getCategoryColor={getCategoryColor}
-                      getCategoryLabel={getCategoryLabel}
-                      getSeverityColor={getSeverityColor}
-                      getRiskScoreColor={getRiskScoreColor}
-                      getRiskScoreLabel={getRiskScoreLabel}
-                    />
+                    {/* Risk Areas */}
+                    {result.riskAreas.length > 0 && (
+                      <div className="card-professional opacity-0 animate-fade-in-up stagger-2">
+                        <div className="flex items-center gap-3 mb-4">
+                          <AlertTriangle className="h-5 w-5 text-amber-500" aria-hidden="true" />
+                          <h2 className="font-heading text-xl font-semibold text-foreground">Potential Risk Areas</h2>
+                        </div>
+                        <div className="space-y-4">
+                          {result.riskAreas.map((risk, index) => (
+                            <div
+                              key={index}
+                              className={cn("p-4 border rounded-md opacity-0 animate-slide-in-right", getSeverityColor(risk.severity))}
+                              style={{ animationDelay: `${0.1 * (index + 1)}s` }}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-medium uppercase tracking-wide">{risk.severity} risk</span>
+                              </div>
+                              <h3 className="font-medium mb-1">{risk.title}</h3>
+                              <p className="text-sm opacity-90 mb-2">{risk.description}</p>
+                              <p className="text-sm font-medium">Recommendation: {risk.recommendation}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Identified Clauses */}
+                    <div className="card-professional opacity-0 animate-fade-in-up stagger-3">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="font-heading text-xl font-semibold text-foreground">Identified Clauses</h2>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" onClick={expandAllClauses} className="text-xs">Expand All</Button>
+                          <Button variant="ghost" size="sm" onClick={collapseAllClauses} className="text-xs">Collapse All</Button>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        {result.clauses.map((clause, index) => (
+                          <Collapsible
+                            key={index}
+                            open={expandedClauses.has(index)}
+                            onOpenChange={() => toggleClause(index)}
+                            className="border border-border rounded-md overflow-hidden opacity-0 animate-fade-in-up"
+                            style={{ animationDelay: `${0.05 * (index + 1)}s` }}
+                          >
+                            <CollapsibleTrigger asChild>
+                              <button className="flex items-center justify-between w-full px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors border-b border-border">
+                                <div className="flex items-center gap-3">
+                                  <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", getCategoryColor(clause.category))}>
+                                    {getCategoryLabel(clause.category)}
+                                  </span>
+                                  <ClauseTooltip category={clause.category} />
+                                  <h3 className="font-semibold text-foreground text-left">{clause.title}</h3>
+                                </div>
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <ConfidenceIndicator matchCount={clause.sentences?.length || 0} />
+                                  <span className="text-xs">{(clause.sentences || []).length} sentence(s)</span>
+                                  {expandedClauses.has(index) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </div>
+                              </button>
+                            </CollapsibleTrigger>
+                            
+                            <CollapsibleContent className="animate-accordion-down">
+                              <div className="px-4 py-3">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Applicable Sentence(s):</p>
+                                <div className="space-y-2">
+                                  {(clause.sentences || []).map((sentence, sIndex) => (
+                                    <blockquote
+                                      key={sIndex}
+                                      className="pl-3 border-l-2 border-accent/40 text-sm text-foreground/90 leading-relaxed italic bg-accent/5 py-2 pr-2 rounded-r"
+                                    >
+                                      "
+                                      <LegalTermHighlighter 
+                                        text={sentence}
+                                        className="contents"
+                                      />
+                                      "
+                                    </blockquote>
+                                  ))}
+                                </div>
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Download Report */}
+                    <div className="card-professional opacity-0 animate-fade-in-up stagger-4 border-accent/20">
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div>
+                          <h2 className="font-heading text-xl font-semibold text-foreground mb-1">Download Analysis Report</h2>
+                          <p className="text-sm text-muted-foreground">Save a complete PDF report of this analysis for your records.</p>
+                        </div>
+                        <Button variant="hero" size="lg" onClick={generateReport} className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Download PDF Report
+                        </Button>
+                      </div>
+                    </div>
 
                     <div className="text-center opacity-0 animate-fade-in-up stagger-5 flex gap-4 justify-center">
                       <Button variant="outline" size="lg" onClick={handleClear}>Analyze Another Contract</Button>
