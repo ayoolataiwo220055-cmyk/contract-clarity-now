@@ -1,1 +1,4 @@
 project_id = "qurhrttgtrwwljldxbfe"
+
+[functions.legal-bert]
+verify_jwt = false
