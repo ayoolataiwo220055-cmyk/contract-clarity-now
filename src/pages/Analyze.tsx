@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Upload, FileText, Loader2, X, Shield, GitCompare, Brain } from "lucide-react";
+import { Upload, FileText, Loader2, X, Shield, GitCompare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PageLayout from "@/components/layout/PageLayout";
@@ -9,7 +9,6 @@ import Disclaimer from "@/components/ui/Disclaimer";
 import ContractComparison from "@/components/analyze/ContractComparison";
 import SectionedOutput from "@/components/analyze/SectionedOutput";
 import KeyDatesCalendar from "@/components/KeyDatesCalendar";
-import SemanticSimilarity from "@/components/SemanticSimilarity";
 import { validateFile, processFile, ProcessingResult, ClauseAnalysis, RiskArea, RiskScore } from "@/lib/fileProcessor";
 import { extractDatesFromText, ContractDate, saveDates } from "@/lib/dateExtractor";
 import { cn } from "@/lib/utils";
@@ -370,16 +369,6 @@ const Analyze = () => {
                     {/* Disclaimer */}
                     <Disclaimer />
 
-                    {/* ML Analysis Indicator */}
-                    {result.mlAnalysisUsed && (
-                      <div className="flex items-center gap-2 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                        <Brain className="h-5 w-5 text-primary" />
-                        <span className="text-sm text-primary font-medium">
-                          ML-powered analysis using LEGAL-BERT
-                        </span>
-                      </div>
-                    )}
-
                     {/* Key Dates Calendar */}
                     {contractDates.length > 0 && (
                       <div className="card-professional opacity-0 animate-fade-in-up">
@@ -389,11 +378,6 @@ const Analyze = () => {
                         />
                       </div>
                     )}
-
-                    {/* Semantic Similarity Search */}
-                    <SemanticSimilarity 
-                      contractSentences={result.clauses.flatMap(c => c.sentences)}
-                    />
 
                     {/* Sectioned Output View */}
                     <SectionedOutput

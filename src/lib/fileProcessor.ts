@@ -1,5 +1,3 @@
-import { classifySentences, getConfidenceLevel, mapMLCategory, type ClassificationResult } from './mlAnalysisService';
-
 export interface ProcessingResult {
   success: boolean;
   text: string;
@@ -10,7 +8,6 @@ export interface ProcessingResult {
   clauses: ClauseAnalysis[];
   riskAreas: RiskArea[];
   riskScore: RiskScore;
-  mlAnalysisUsed?: boolean;
 }
 
 export interface RiskScore {
@@ -26,7 +23,6 @@ export interface ClauseAnalysis {
   keywords: string[]; // Keywords that matched this clause
   section?: string; // Document section where clause was found
   confidence: 'strong' | 'moderate' | 'weak'; // Match confidence
-  mlScore?: number; // ML confidence score (0-1)
 }
 
 export interface RiskArea {
@@ -40,12 +36,6 @@ export interface DocumentSection {
   title: string;
   startIndex: number;
   endIndex: number;
-}
-
-// Check if ML analysis is enabled in settings
-function isMLAnalysisEnabled(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem('contract-clarity-ml-analysis') === 'true';
 }
 
 const ALLOWED_TYPES = [
@@ -674,7 +664,7 @@ function calculateRiskScore(riskAreas: RiskArea[]): RiskScore {
   return { score, level, summary };
 }
 
-export async function processFile(file: File, useMLAnalysis?: boolean): Promise<ProcessingResult> {
+export async function processFile(file: File): Promise<ProcessingResult> {
   const extension = '.' + file.name.split('.').pop()?.toLowerCase();
   
   let text = '';
@@ -691,42 +681,8 @@ export async function processFile(file: File, useMLAnalysis?: boolean): Promise<
       text = await extractTxtText(file);
     }
     
-    // Normalize extracted text
-    text = normalizeText(text);
-    
     const wordCount = text.split(/\s+/).filter(word => word.length > 0).length;
-    
-    // Determine if ML analysis should be used
-    const shouldUseML = useMLAnalysis !== undefined ? useMLAnalysis : isMLAnalysisEnabled();
-    
-    let clauses: ClauseAnalysis[];
-    let riskAreas: RiskArea[];
-    let riskScore: RiskScore;
-    let mlAnalysisUsed = false;
-    
-    if (shouldUseML) {
-      try {
-        // Use ML-based analysis
-        const mlResult = await analyzeTextWithML(text);
-        clauses = mlResult.clauses;
-        riskAreas = mlResult.riskAreas;
-        riskScore = mlResult.riskScore;
-        mlAnalysisUsed = true;
-      } catch (mlError) {
-        console.warn('ML analysis failed, falling back to rule-based:', mlError);
-        // Fall back to rule-based analysis
-        const ruleResult = analyzeText(text);
-        clauses = ruleResult.clauses;
-        riskAreas = ruleResult.riskAreas;
-        riskScore = ruleResult.riskScore;
-      }
-    } else {
-      // Use rule-based analysis
-      const ruleResult = analyzeText(text);
-      clauses = ruleResult.clauses;
-      riskAreas = ruleResult.riskAreas;
-      riskScore = ruleResult.riskScore;
-    }
+    const { clauses, riskAreas, riskScore } = analyzeText(text);
     
     return {
       success: true,
@@ -738,7 +694,6 @@ export async function processFile(file: File, useMLAnalysis?: boolean): Promise<
       clauses,
       riskAreas,
       riskScore,
-      mlAnalysisUsed,
     };
   } catch (error) {
     console.error('File processing error:', error);
@@ -751,175 +706,6 @@ export async function processFile(file: File, useMLAnalysis?: boolean): Promise<
       clauses: [],
       riskAreas: [],
       riskScore: { score: 0, level: 'low', summary: 'Unable to analyze document.' },
-      mlAnalysisUsed: false,
     };
   }
-}
-
-// ML-based text analysis using LEGAL-BERT
-async function analyzeTextWithML(text: string): Promise<{ clauses: ClauseAnalysis[]; riskAreas: RiskArea[]; riskScore: RiskScore }> {
-  const sentences = segmentSentences(text);
-  const sections = detectSections(text);
-  
-  // Filter sentences to analyze (avoid very short or too long sentences)
-  const sentencesToAnalyze = sentences.filter(s => s.length > 20 && s.length < 1000);
-  
-  // Classify sentences using ML
-  const classificationResults = await classifySentences(sentencesToAnalyze);
-  
-  // Group sentences by category
-  const categoryMap = new Map<string, { sentences: string[]; scores: number[] }>();
-  
-  for (const result of classificationResults) {
-    const category = mapMLCategory(result.category);
-    if (category === 'other' && result.confidence < 0.3) continue; // Skip low confidence "other"
-    
-    if (!categoryMap.has(category)) {
-      categoryMap.set(category, { sentences: [], scores: [] });
-    }
-    
-    const entry = categoryMap.get(category)!;
-    entry.sentences.push(result.sentence);
-    entry.scores.push(result.confidence);
-  }
-  
-  // Build clause analysis from ML results
-  const clauses: ClauseAnalysis[] = [];
-  
-  const categoryTitles: Record<string, string> = {
-    'compensation': 'Compensation Clause',
-    'termination': 'Termination Clause',
-    'confidentiality': 'Confidentiality Clause',
-    'non-compete': 'Non-Compete Clause',
-    'benefits': 'Benefits Clause',
-    'non-solicitation': 'Non-Solicitation Clause',
-    'relocation': 'Relocation Clause',
-    'dispute-resolution': 'Dispute Resolution Clause',
-    'intellectual-property': 'Intellectual Property Clause',
-    'probation': 'Probation Period Clause',
-    'overtime': 'Overtime Clause',
-    'other': 'Other Clause'
-  };
-  
-  for (const [category, data] of categoryMap) {
-    if (data.sentences.length === 0) continue;
-    
-    const avgScore = data.scores.reduce((a, b) => a + b, 0) / data.scores.length;
-    const topSentences = data.sentences.slice(0, 5); // Top 5 sentences per category
-    
-    // Find section for first sentence
-    const firstSentenceIndex = text.indexOf(topSentences[0]);
-    const section = findSectionForIndex(firstSentenceIndex, sections);
-    
-    clauses.push({
-      title: categoryTitles[category] || `${category.charAt(0).toUpperCase() + category.slice(1)} Clause`,
-      category: category as ClauseAnalysis['category'],
-      sentences: topSentences,
-      keywords: [], // ML doesn't use keywords
-      section,
-      confidence: getConfidenceLevel(avgScore),
-      mlScore: avgScore,
-    });
-  }
-  
-  // Sort by ML score
-  clauses.sort((a, b) => (b.mlScore || 0) - (a.mlScore || 0));
-  
-  // Add fallback if no clauses detected
-  if (clauses.length === 0) {
-    clauses.push({
-      title: 'General Contract Content',
-      category: 'other',
-      sentences: ['Document uploaded successfully. ML analysis did not detect specific clause patterns.'],
-      keywords: [],
-      confidence: 'weak',
-    });
-  }
-  
-  // Generate risk areas based on ML detected clauses
-  const riskAreas = generateRiskAreasFromMLClauses(clauses, text);
-  
-  // Calculate risk score
-  const riskScore = calculateRiskScore(riskAreas);
-  
-  return { clauses, riskAreas, riskScore };
-}
-
-// Generate risk areas based on ML-classified clauses
-function generateRiskAreasFromMLClauses(clauses: ClauseAnalysis[], text: string): RiskArea[] {
-  const riskAreas: RiskArea[] = [];
-  const lowerText = text.toLowerCase();
-  
-  for (const clause of clauses) {
-    switch (clause.category) {
-      case 'non-compete':
-        riskAreas.push({
-          severity: 'high',
-          title: 'Non-Compete Restrictions (ML Detected)',
-          description: 'ML analysis detected clauses that may limit your future employment options.',
-          recommendation: 'Review the scope, duration, and geographic limitations carefully.',
-        });
-        break;
-        
-      case 'intellectual-property':
-        if (clause.sentences.some(s => 
-          s.toLowerCase().includes('all inventions') || 
-          s.toLowerCase().includes('assign all rights')
-        )) {
-          riskAreas.push({
-            severity: 'high',
-            title: 'Broad IP Assignment (ML Detected)',
-            description: 'This contract may require assignment of intellectual property rights.',
-            recommendation: 'Clarify scope of IP assignment and negotiate carve-outs for personal projects.',
-          });
-        }
-        break;
-        
-      case 'termination':
-        if (clause.sentences.some(s => 
-          s.toLowerCase().includes('at will') || 
-          s.toLowerCase().includes('immediate termination')
-        )) {
-          riskAreas.push({
-            severity: 'medium',
-            title: 'At-Will Employment (ML Detected)',
-            description: 'This contract may allow termination without cause.',
-            recommendation: 'Clarify termination conditions and notice requirements.',
-          });
-        }
-        break;
-        
-      case 'relocation':
-        if (lowerText.includes('required to relocate') || lowerText.includes('mandatory relocation')) {
-          riskAreas.push({
-            severity: 'high',
-            title: 'Mandatory Relocation (ML Detected)',
-            description: 'This contract may require relocation at employer request.',
-            recommendation: 'Clarify relocation terms and notice periods.',
-          });
-        }
-        break;
-        
-      case 'non-solicitation':
-        riskAreas.push({
-          severity: 'medium',
-          title: 'Non-Solicitation Restrictions (ML Detected)',
-          description: 'ML detected limitations on contacting former colleagues or clients.',
-          recommendation: 'Understand which relationships are covered and for how long.',
-        });
-        break;
-    }
-  }
-  
-  // Check for waiver language
-  if (lowerText.includes('waive') || lowerText.includes('forfeit')) {
-    riskAreas.push({
-      severity: 'medium',
-      title: 'Rights Waiver Language',
-      description: 'The contract contains language about waiving certain rights.',
-      recommendation: 'Understand exactly what rights you may be giving up.',
-    });
-  }
-  
-  return riskAreas;
 }

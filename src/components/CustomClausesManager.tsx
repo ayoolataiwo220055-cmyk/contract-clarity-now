@@ -156,16 +156,16 @@ export const CustomClausesManager = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-extrabold text-foreground leading-tight">Custom Clauses Library</h2>
-          <p className="text-base text-muted-foreground mt-2 max-w-xl">
+          <h2 className="text-2xl font-bold text-foreground">Custom Clauses Library</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Create and manage industry-specific contract clauses tailored to your needs
           </p>
         </div>
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleImport} className="gap-2">
             <Upload className="h-4 w-4" />
             Import
@@ -176,8 +176,6 @@ export const CustomClausesManager = () => {
           </Button>
         </div>
       </div>
-
-      <div className="border-t border-border mt-4" />
 
       {/* Import Message */}
       {importMessage && (
@@ -196,7 +194,7 @@ export const CustomClausesManager = () => {
       {/* Add New Clause Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <Button className="gap-2 px-4 py-2">
+          <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Add Custom Clause
           </Button>
@@ -280,7 +278,7 @@ export const CustomClausesManager = () => {
 
       {/* Clauses List */}
       {clauses.length === 0 ? (
-        <Alert className="p-4 rounded-lg">
+        <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             No custom clauses yet. Create one to start building your personal clause library that will be detected in contracts you analyze.
@@ -291,12 +289,12 @@ export const CustomClausesManager = () => {
           {clauses.map((clause) => (
             <div
               key={clause.id}
-              className="p-6 border rounded-lg bg-card hover:border-accent/50 transition-colors"
+              className="p-4 border rounded-lg bg-card hover:border-accent/50 transition-colors"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-semibold text-foreground">{clause.name}</h3>
+                    <h3 className="font-semibold text-foreground">{clause.name}</h3>
                     {clause.riskLevel && (
                       <Badge className={riskLevelColor(clause.riskLevel)}>
                         {clause.riskLevel} Risk
@@ -342,7 +340,7 @@ export const CustomClausesManager = () => {
       )}
 
       {/* Info Box */}
-      <Alert className="p-4 rounded-lg">
+      <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           <strong>Tip:</strong> Custom clauses are stored locally in your browser. Export your library to back it up or share it with team members.
